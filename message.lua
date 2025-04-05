@@ -41,7 +41,7 @@ function CreateESP(player)
     box.Visible = false
 
     local healthText = Drawing.new("Text")
-    healthText.Size = 18
+    healthText.Size = 50
     healthText.Color = Color3.fromRGB(255, 255, 255)
     healthText.Outline = true
     healthText.Visible = false
