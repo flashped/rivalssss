@@ -1,122 +1,127 @@
--- 📌 Chargement des services
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Création du GUI
+local screenGui = Instance.new("ScreenGui", PlayerGui)
+screenGui.Name = "CheatMenu"
+screenGui.ResetOnSpawn = false
 
 -- 📌 Paramètres
 local Settings = {
-    ESP_Enabled = true,
-    AimAssist_Enabled = false,
-    AimAssist_FOV = 200,
-    AimAssist_Smoothness = 0.4,
-    ESP_MaxDistance = 150,
-    NoRecoil_Enabled = true,
-    NoRecoil_Power = 0.8
+    AimbotEnabled = false,
+    ShowFOV = true,
+    FOVRadius = 200,
+    ESPEnabled = true,
+    ESPRainbow = true,
+    ESPColor = Color3.fromRGB(255, 255, 255)
 }
 
-local ESP_Boxes = {}
-local Health_Texts = {}
+-- 📌 Cercle FOV
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Color = Color3.fromRGB(255, 0, 0)
+FOVCircle.Radius = Settings.FOVRadius
+FOVCircle.Thickness = 1
+FOVCircle.NumSides = 100
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+FOVCircle.Visible = Settings.ShowFOV
 
--- 📌 Cercle de FOV (désactivé ici pour test)
-local FOV_Circle = Drawing.new("Circle")
-FOV_Circle.Color = Color3.fromRGB(255, 0, 0)
-FOV_Circle.Radius = Settings.AimAssist_FOV
-FOV_Circle.Thickness = 1
-FOV_Circle.NumSides = 100
-FOV_Circle.Filled = false
-FOV_Circle.Transparency = 1
-FOV_Circle.Visible = false -- désactivé temporairement
+-- 📌 Mise à jour FOV à l’écran
+game:GetService("RunService").RenderStepped:Connect(function()
+    FOVCircle.Position = workspace.CurrentCamera.ViewportSize / 2
+    FOVCircle.Visible = Settings.ShowFOV
+    FOVCircle.Radius = Settings.FOVRadius
+end)
 
--- 📌 Création ESP
-function CreateESP(player)
-    if ESP_Boxes[player] then return end
-
-    local box = Drawing.new("Square")
-    box.Thickness = 2
-    box.Filled = false
-    box.Transparency = 1
-    box.Visible = false
-
-    local healthText = Drawing.new("Text")
-    healthText.Size = 16
-    healthText.Color = Color3.fromRGB(255, 255, 255)
-    healthText.Outline = true
-    healthText.Center = true
-    healthText.Visible = false
-
-    ESP_Boxes[player] = box
-    Health_Texts[player] = healthText
+-- Fonction pour créer un bouton
+local function createButton(parent, text, position, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 200, 0, 30)
+    button.Position = position
+    button.Text = text
+    button.TextSize = 16
+    button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Parent = parent
+    button.MouseButton1Click:Connect(callback)
+    return button
 end
 
--- 📌 Suppression ESP
-function RemoveESP(player)
-    if ESP_Boxes[player] then
-        ESP_Boxes[player]:Remove()
-        ESP_Boxes[player] = nil
-    end
-    if Health_Texts[player] then
-        Health_Texts[player]:Remove()
-        Health_Texts[player] = nil
-    end
-end
+-- 📌 Onglet principal
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 220, 0, 300)
+frame.Position = UDim2.new(0, 20, 0.5, -150)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.Parent = screenGui
 
--- 📌 Fonction de couleur multicolore dynamique
-function GetRainbowColor()
-    local hue = tick() % 5 / 5 -- valeur entre 0 et 1
-    return Color3.fromHSV(hue, 1, 1)
-end
+-- 📌 Onglets
+local tab = "aimbot" -- actif par défaut
 
--- 📌 Mise à jour ESP
-function UpdateESP()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
-            local rootPart = player.Character.HumanoidRootPart
-            local humanoid = player.Character.Humanoid
-            local distance = (LocalPlayer.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude
-
-            if distance <= Settings.ESP_MaxDistance then
-                local pos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
-
-                if not ESP_Boxes[player] then
-                    CreateESP(player)
-                end
-
-                local box = ESP_Boxes[player]
-                local healthText = Health_Texts[player]
-
-                local size = Vector2.new(2500 / pos.Z, 3500 / pos.Z)
-                local position = Vector2.new(pos.X - size.X / 2, pos.Y - size.Y / 2)
-
-                -- 🎨 Couleur multicolore
-                local rainbow = GetRainbowColor()
-
-                box.Size = size
-                box.Position = position
-                box.Visible = onScreen and Settings.ESP_Enabled
-                box.Color = rainbow
-
-                healthText.Position = Vector2.new(pos.X, pos.Y - size.Y / 2 - 15)
-                healthText.Text = math.floor(humanoid.Health) .. " HP"
-                healthText.Visible = onScreen and Settings.ESP_Enabled
-                healthText.Color = rainbow
-            else
-                if ESP_Boxes[player] then ESP_Boxes[player].Visible = false end
-                if Health_Texts[player] then Health_Texts[player].Visible = false end
-            end
-        elseif ESP_Boxes[player] then
-            ESP_Boxes[player].Visible = false
-            Health_Texts[player].Visible = false
+local function updateTabs()
+    for _, obj in pairs(frame:GetChildren()) do
+        if obj:IsA("TextButton") and obj.Name ~= "TabAimbot" and obj.Name ~= "TabESP" then
+            obj.Visible = (tab == "aimbot" and obj.Name:match("^Aimbot")) or (tab == "esp" and obj.Name:match("^ESP"))
         end
     end
 end
 
--- 📌 Mise à jour continue
-RunService.RenderStepped:Connect(function()
-    UpdateESP()
+local tabAimbot = createButton(frame, "🎯 Aimbot", UDim2.new(0, 0, 0, 0), function()
+    tab = "aimbot"
+    updateTabs()
 end)
+tabAimbot.Name = "TabAimbot"
 
--- 📌 Suppression des ESP quand un joueur quitte
-Players.PlayerRemoving:Connect(RemoveESP)
+local tabESP = createButton(frame, "🧿 ESP", UDim2.new(0, 110, 0, 0), function()
+    tab = "esp"
+    updateTabs()
+end)
+tabESP.Name = "TabESP"
+
+-- 📌 Boutons Aimbot
+createButton(frame, "Aimbot: OFF", UDim2.new(0, 10, 0, 40), function(self)
+    Settings.AimbotEnabled = not Settings.AimbotEnabled
+    self.Text = "Aimbot: " .. (Settings.AimbotEnabled and "ON" or "OFF")
+end).Name = "AimbotToggle"
+
+createButton(frame, "FOV: ON", UDim2.new(0, 10, 0, 80), function(self)
+    Settings.ShowFOV = not Settings.ShowFOV
+    self.Text = "FOV: " .. (Settings.ShowFOV and "ON" or "OFF")
+end).Name = "AimbotFOVToggle"
+
+createButton(frame, "FOV +", UDim2.new(0, 10, 0, 120), function()
+    Settings.FOVRadius = Settings.FOVRadius + 20
+end).Name = "AimbotFOVPlus"
+
+createButton(frame, "FOV -", UDim2.new(0, 110, 0, 120), function()
+    Settings.FOVRadius = math.max(20, Settings.FOVRadius - 20)
+end).Name = "AimbotFOVMinus"
+
+-- 📌 Boutons ESP
+createButton(frame, "ESP: ON", UDim2.new(0, 10, 0, 40), function(self)
+    Settings.ESPEnabled = not Settings.ESPEnabled
+    self.Text = "ESP: " .. (Settings.ESPEnabled and "ON" or "OFF")
+end).Name = "ESPToggle"
+
+createButton(frame, "Rainbow: ON", UDim2.new(0, 10, 0, 80), function(self)
+    Settings.ESPRainbow = not Settings.ESPRainbow
+    self.Text = "Rainbow: " .. (Settings.ESPRainbow and "ON" or "OFF")
+end).Name = "ESPRainbowToggle"
+
+createButton(frame, "Couleur: Rouge", UDim2.new(0, 10, 0, 120), function(self)
+    local colors = {
+        Color3.fromRGB(255, 0, 0),
+        Color3.fromRGB(0, 255, 0),
+        Color3.fromRGB(0, 0, 255),
+        Color3.fromRGB(255, 255, 0),
+        Color3.fromRGB(255, 255, 255)
+    }
+    local names = {"Rouge", "Vert", "Bleu", "Jaune", "Blanc"}
+    local currentIndex = table.find(colors, Settings.ESPColor) or 0
+    local nextIndex = currentIndex + 1
+    if nextIndex > #colors then nextIndex = 1 end
+    Settings.ESPColor = colors[nextIndex]
+    self.Text = "Couleur: " .. names[nextIndex]
+end).Name = "ESPColorPicker"
+
+updateTabs()
